@@ -4,6 +4,7 @@ import json
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import pandas as pd
+import plotly.express as px # Plotly Express 임포트
 
 # --- 구글 인증 및 시트 연결 (기존 코드와 동일) ---
 scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -31,6 +32,8 @@ def load_data_from_sheet():
         if data:
             df = pd.DataFrame(data)
             df.columns = ['이름', '등록시간']
+            # '등록시간' 컬럼을 datetime 객체로 변환
+            df['등록시간'] = pd.to_datetime(df['등록시간'])
             return df
         return pd.DataFrame(columns=['이름', '등록시간']) # 데이터 없으면 빈 DataFrame 반환
     except Exception as e:
@@ -186,6 +189,44 @@ else:
     if not df_dashboard.empty:
         # 대시보드용으로 인덱스 조정 (사용자에게 1-based 인덱스처럼 보이게)
         st.dataframe(df_dashboard.reset_index().rename(columns={'index': '인덱스'}), use_container_width=True)
+        
+        st.markdown("---")
+        st.subheader("📊 우유 마시기 현황 시각화")
+
+        # 1. 학생별 우유 마시기 횟수
+        st.markdown("#### 🧑‍🎓 학생별 우유 마시기 횟수")
+        student_counts = df_dashboard['이름'].value_counts().reset_index()
+        student_counts.columns = ['이름', '횟수']
+        fig_student_counts = px.bar(
+            student_counts,
+            x='이름',
+            y='횟수',
+            title='학생별 우유 마시기 횟수',
+            labels={'이름': '학생 이름', '횟수': '우유 마신 횟수'},
+            color='횟수', # 횟수에 따라 색상 변화
+            color_continuous_scale=px.colors.sequential.Viridis # 색상 스케일
+        )
+        fig_student_counts.update_layout(xaxis_title="학생 이름", yaxis_title="우유 마신 횟수")
+        st.plotly_chart(fig_student_counts, use_container_width=True)
+
+        # 2. 시간대별 우유 마시기 현황
+        st.markdown("#### ⏰ 시간대별 우유 마시기 현황")
+        # '등록시간'에서 시간(hour)만 추출
+        df_dashboard['시간'] = df_dashboard['등록시간'].dt.hour
+        hourly_counts = df_dashboard['시간'].value_counts().sort_index().reset_index()
+        hourly_counts.columns = ['시간', '횟수']
+        fig_hourly_counts = px.bar(
+            hourly_counts,
+            x='시간',
+            y='횟수',
+            title='시간대별 우유 마시기 현황',
+            labels={'시간': '시간 (시)', '횟수': '우유 마신 횟수'},
+            color='횟수',
+            color_continuous_scale=px.colors.sequential.Plasma
+        )
+        fig_hourly_counts.update_layout(xaxis_title="시간 (0-23시)", yaxis_title="우유 마신 횟수", xaxis_tickangle=-45)
+        st.plotly_chart(fig_hourly_counts, use_container_width=True)
+
     else:
         st.info("아직 등록된 친구가 없어요.")
 
