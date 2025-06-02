@@ -66,7 +66,7 @@ if all_tasks_completed:
                 })
                 st.success(f"{student_name}님, 할일 완료 기록이 저장되었습니다! 멋져요!")
                 # 페이지 새로고침하여 대시보드 업데이트 (선택 사항)
-                st.experimental_rerun()
+                st.rerun() # 여기가 변경되었습니다.
             else:
                 st.warning("이름을 입력해주세요!")
 else:
