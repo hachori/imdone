@@ -11,7 +11,7 @@ scope = [
 ]
 
 # JSON 키 파일명
-credentials = ServiceAccountCredentials.from_json_keyfile_name('cridentials.json', scope)
+credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
 client = gspread.authorize(credentials)
 
 # --- Google Sheet 연결 (URL의 ID 사용) ---
