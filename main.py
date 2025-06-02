@@ -44,11 +44,29 @@ def delete_data_from_sheet(row_index):
         # gspread는 1-based index를 사용합니다.
         # df.index는 0-based이므로 1을 더해야 합니다.
         sheet.delete_rows(row_index + 1)
-        st.success(f"{row_index}번째 행의 데이터가 삭제되었습니다.")
+        st.success(f"{row_index + 1}번째 행의 데이터가 삭제되었습니다.") # 사용자에게 1-based 인덱스 표시
         st.cache_data.clear() # 캐시 무효화
         st.rerun() # 페이지 새로고침
     except Exception as e:
         st.error(f"데이터 삭제 중 오류 발생: {e}")
+        st.exception(e)
+
+# --- 전체 기록 초기화 함수 ---
+def clear_all_data_from_sheet():
+    try:
+        # 시트의 모든 내용을 지웁니다. (첫 행은 헤더로 유지)
+        # get_all_values()를 사용하여 현재 시트의 크기를 파악하고,
+        # 첫 행을 제외한 나머지 행을 지웁니다.
+        all_values = sheet.get_all_values()
+        if len(all_values) > 1: # 헤더 행(1행)만 있고 데이터가 없는 경우가 아니면
+            sheet.delete_rows(2, len(all_values)) # 2행부터 마지막 행까지 삭제
+            st.success("모든 기록이 성공적으로 초기화되었습니다.")
+            st.cache_data.clear() # 캐시 무효화
+            st.rerun() # 페이지 새로고침
+        else:
+            st.info("시트에 삭제할 기록이 없습니다.")
+    except Exception as e:
+        st.error(f"전체 기록 초기화 중 오류 발생: {e}")
         st.exception(e)
 
 # --- 페이지 설정 ---
@@ -88,23 +106,38 @@ if "page" in query_params and query_params["page"] == "admin":
         df_all_data = load_data_from_sheet()
 
         if not df_all_data.empty:
-            st.dataframe(df_all_data.reset_index(names=['인덱스']), use_container_width=True) # 인덱스를 열로 표시
+            # 인덱스를 열로 표시할 때, 1-based 인덱스를 보여주기 위해 +1
+            st.dataframe(df_all_data.reset_index().rename(columns={'index': '인덱스'}), use_container_width=True)
             st.markdown("---")
 
             st.subheader("기록 삭제")
             st.warning("경고: 삭제된 데이터는 복구할 수 없습니다!")
 
-            row_to_delete = st.number_input(
-                "삭제할 행의 '인덱스'를 입력하세요 (표의 첫 번째 열)",
-                min_value=0,
-                max_value=len(df_all_data) - 1,
-                value=0,
-                step=1
-            )
-            delete_button = st.button("선택한 기록 삭제")
+            col1, col2 = st.columns(2) # 삭제 버튼들을 위한 컬럼 분리
 
-            if delete_button:
-                delete_data_from_sheet(row_to_delete)
+            with col1:
+                row_to_delete = st.number_input(
+                    "삭제할 행의 '인덱스'를 입력하세요 (표의 첫 번째 열)",
+                    min_value=0, # DataFrame 인덱스는 0부터 시작
+                    max_value=len(df_all_data) - 1 if len(df_all_data) > 0 else 0,
+                    value=0,
+                    step=1,
+                    key="single_delete_input" # 고유 키 추가
+                )
+                delete_button = st.button("선택한 기록 삭제", key="single_delete_button")
+
+                if delete_button:
+                    # gspread의 delete_rows는 1-based 인덱스를 사용하므로 +1
+                    delete_data_from_sheet(row_to_delete)
+            
+            with col2:
+                st.subheader("전체 기록 초기화")
+                st.warning("경고: 이 버튼을 누르면 모든 기록이 영구적으로 삭제됩니다!")
+                confirm_clear = st.checkbox("정말로 모든 기록을 삭제하시겠습니까?", key="confirm_clear_checkbox")
+                clear_all_button = st.button("전체 기록 초기화", disabled=not confirm_clear, key="clear_all_button")
+
+                if clear_all_button and confirm_clear:
+                    clear_all_data_from_sheet()
         else:
             st.info("아직 등록된 기록이 없습니다.")
 
@@ -151,8 +184,8 @@ else:
     # 대시보드 표시
     df_dashboard = load_data_from_sheet() # 캐싱된 함수 사용
     if not df_dashboard.empty:
-        df_dashboard.index += 1 # 대시보드용으로 인덱스 조정
-        st.dataframe(df_dashboard, use_container_width=True)
+        # 대시보드용으로 인덱스 조정 (사용자에게 1-based 인덱스처럼 보이게)
+        st.dataframe(df_dashboard.reset_index().rename(columns={'index': '인덱스'}), use_container_width=True)
     else:
         st.info("아직 등록된 친구가 없어요.")
 
@@ -169,4 +202,3 @@ else:
     if st.sidebar.button("관리자 페이지"):
         st.query_params["page"] = "admin"
         st.rerun()
-
